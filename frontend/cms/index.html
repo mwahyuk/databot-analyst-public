@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="DataBot CMS — Panel admin untuk mengonfigurasi chatbot analisis data.">
+  <title>DataBot CMS — Admin Panel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/assets/js/config.js"></script>
+  <script>
+    // Protection for Admin Only
+    (async () => {
+      try {
+        const supabaseCheck = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+        const { data: { session }, error: authError } = await supabaseCheck.auth.getSession();
+        
+        if (authError || !session) {
+          console.error('Auth session error:', authError);
+          window.location.href = '/login.html';
+          return;
+        }
+        
+        console.log('User session found:', session.user.email);
+        
+        // Check role in tb_profiles
+        const { data: profile, error: profileError } = await supabaseCheck
+          .from('tb_profiles')
+          .select('role')
+          .eq('id', session.user.id)
+          .maybeSingle();
+        
+        if (profileError) {
+          console.error('Error fetching profile:', profileError);
+          alert('Terjadi kesalahan saat memverifikasi hak akses: ' + profileError.message);
+          window.location.href = '/index.html';
+          return;
+        }
+
+        console.log('User role:', profile?.role);
+        
+        if (!profile || profile.role !== 'admin') {
+          alert('Akses Ditolak: Area ini hanya untuk Administrator (Role: ' + (profile?.role || 'null') + ')');
+          window.location.href = '/index.html';
+        }
+      } catch (err) {
+        console.error('Admin check failed:', err);
+        alert('Gagal melakukan pengecekan admin: ' + err.message);
+      }
+    })();
+  </script>
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="stylesheet" href="/cms/assets/cms.css">
+</head>
+<body class="cms-body">
+  <!-- CMS Sidebar -->
+  <aside class="cms-sidebar" id="cmsSidebar">
+    <div class="cms-sidebar-header">
+      <a href="/" class="cms-logo">
+        <span class="logo-icon">🤖</span>
+        <span class="logo-text">DataBot</span>
+      </a>
+      <span class="cms-badge">CMS</span>
+    </div>
+
+    <nav class="cms-nav">
+      <button class="cms-nav-item active" data-page="dashboard" onclick="CMS.navigate('dashboard')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        Dashboard
+      </button>
+      <button class="cms-nav-item" data-page="config" onclick="CMS.navigate('config')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 00-2 2v.18a2 2 0 01-1 1.73l-.43.25a2 2 0 01-2 0l-.15-.08a2 2 0 00-2.73.73l-.22.38a2 2 0 00.73 2.73l.15.1a2 2 0 011 1.72v.51a2 2 0 01-1 1.74l-.15.09a2 2 0 00-.73 2.73l.22.38a2 2 0 002.73.73l.15-.08a2 2 0 012 0l.43.25a2 2 0 011 1.73V20a2 2 0 002 2h.44a2 2 0 002-2v-.18a2 2 0 011-1.73l.43-.25a2 2 0 012 0l.15.08a2 2 0 002.73-.73l.22-.39a2 2 0 00-.73-2.73l-.15-.08a2 2 0 01-1-1.74v-.5a2 2 0 011-1.74l.15-.09a2 2 0 00.73-2.73l-.22-.38a2 2 0 00-2.73-.73l-.15.08a2 2 0 01-2 0l-.43-.25a2 2 0 01-1-1.73V4a2 2 0 00-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+        Konfigurasi Bot
+      </button>
+      <button class="cms-nav-item" data-page="sources" onclick="CMS.navigate('sources')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+        Sumber Data
+      </button>
+      <button class="cms-nav-item" data-page="schema" onclick="CMS.navigate('schema')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v18H3z"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>
+        Schema & Kolom
+      </button>
+      <button class="cms-nav-item" data-page="examples" onclick="CMS.navigate('examples')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+        Prompt Examples
+      </button>
+      <button class="cms-nav-item" data-page="glossary" onclick="CMS.navigate('glossary')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+        Glossary
+      </button>
+      <button class="cms-nav-item" data-page="history" onclick="CMS.navigate('history')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        Riwayat Chat
+      </button>
+      <button class="cms-nav-item" data-page="users" onclick="CMS.navigate('users')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+        Manajemen User
+        <span class="nav-badge" id="userBadge" style="display:none;">0</span>
+      </button>
+    </nav>
+
+    <div class="cms-sidebar-footer">
+      <div class="cms-footer-menu">
+        <button class="cms-footer-item" onclick="CMS.openChangePasswordModal()" title="Ubah Password">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+          <span>Ubah Password</span>
+        </button>
+        <button class="cms-footer-item" onclick="CMS.toggleTheme()" title="Ganti Tema">
+          <svg class="sun-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+          <svg class="moon-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+          <span>Ganti Tema</span>
+        </button>
+        <a href="/" class="cms-footer-item" title="Kembali ke Chat">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+          <span>Kembali ke Chat</span>
+        </a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="cms-main" id="cmsMain">
+    <div class="cms-topbar">
+      <button class="mobile-menu-btn" onclick="document.getElementById('cmsSidebar').classList.toggle('open')">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+      </button>
+      <h2 class="cms-page-title" id="cmsPageTitle">Dashboard</h2>
+    </div>
+
+    <!-- Pages -->
+    <div class="cms-content" id="cmsContent">
+      <!-- Content loaded dynamically -->
+    </div>
+  </main>
+
+  <!-- Modal -->
+  <div class="modal-overlay" id="modalOverlay" style="display:none;" onclick="CMS.closeModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3 id="modalTitle">Modal</h3>
+        <button class="modal-close" onclick="CMS.closeModal()">✕</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+      <div class="modal-footer" id="modalFooter"></div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="/assets/js/api.js"></script>
+  <script src="/cms/assets/cms.js"></script>
+</body>
+</html>

@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="DataBot — Chatbot analisis data cerdas berbasis AI. Ajukan pertanyaan tentang data Anda dalam bahasa natural.">
+  <title>DataBot — Analisis Data Cerdas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/alasql@4"></script>
+  <link rel="stylesheet" href="assets/css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/js/config.js"></script>
+  <script>
+    // Quick check before app loads
+    const supabaseCheck = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+    supabaseCheck.auth.getSession().then(async ({data}) => {
+      if (!data.session) {
+        window.location.href = 'login.html';
+        return;
+      }
+      
+      // Check verification status & role
+      const { data: profile } = await supabaseCheck
+        .from('tb_profiles')
+        .select('is_verified, role')
+        .eq('id', data.session.user.id)
+        .single();
+      
+      if (profile) {
+        if (!profile.is_verified) {
+          document.body.innerHTML = `
+            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; background:var(--bg-primary); color:var(--text-primary); font-family:var(--font-main); text-align:center; padding:20px;">
+              <div style="font-size:4rem; margin-bottom:20px;">⏳</div>
+              <h1 style="margin-bottom:10px;">Akun Menunggu Verifikasi</h1>
+              <p style="color:var(--text-muted); max-width:400px;">Halo! Akun Anda sudah terdaftar, namun memerlukan verifikasi dari Administrator sebelum dapat digunakan. Mohon tunggu beberapa saat atau hubungi tim IT.</p>
+              <button onclick="localStorage.clear(); location.reload();" style="margin-top:30px; padding:10px 20px; border-radius:8px; border:none; background:var(--bg-tertiary); color:var(--text-primary); cursor:pointer;">Logout & Refresh</button>
+            </div>
+          `;
+          return;
+        }
+
+        // Show CMS link only for admins
+        if (profile.role === 'admin') {
+          const cmsLink = document.getElementById('cmsLink');
+          if (cmsLink) cmsLink.style.display = 'flex';
+        }
+      }
+    });
+  </script>
+</head>
+<body>
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <span class="logo-icon" id="botAvatar">🤖</span>
+        <span class="logo-text" id="botNameSidebar">DataBot</span>
+      </div>
+      <button class="sidebar-toggle" id="sidebarToggle" title="Toggle Sidebar">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+    </div>
+
+    <button class="new-chat-btn" id="newChatBtn">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+      <span>Chat Baru</span>
+    </button>
+
+    <div class="sidebar-section">
+      <h3 class="sidebar-section-title">Sumber Data</h3>
+      <div class="source-list" id="sourceList">
+        <!-- populated via JS -->
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:var(--space-xs);">
+        <h3 class="sidebar-section-title" style="padding:0;">Riwayat Chat</h3>
+        <button id="clearHistoryBtn" title="Hapus Semua Riwayat" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:0.8rem; padding:4px; display:flex; align-items:center; justify-content:center; border-radius:4px;" onmouseover="this.style.background='var(--bg-tertiary)';this.style.color='var(--danger)'" onmouseout="this.style.background='none';this.style.color='var(--text-muted)'">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path></svg>
+        </button>
+      </div>
+      <div class="session-list" id="sessionList">
+        <!-- populated via JS -->
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="usage-info" id="usageTextSidebar">Kuota: 0 / 20</div>
+      <div class="footer-menu">
+        <a href="cms/index.html" id="cmsLink" class="footer-menu-item cms-link" title="Buka CMS Admin" style="display:none;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          <span>Admin CMS</span>
+        </a>
+        <button class="footer-menu-item" id="changePasswordBtn" title="Ubah Password">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+          <span>Ubah Password</span>
+        </button>
+        <button class="footer-menu-item" id="themeToggle" title="Ganti Tema">
+          <svg class="sun-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+          <svg class="moon-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+          <span>Ganti Tema</span>
+        </button>
+        <button class="footer-menu-item logout-item" id="logoutBtn" title="Logout">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+          <span>Logout</span>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Chat Area -->
+  <main class="main-content" id="mainContent">
+    <!-- Welcome Screen -->
+    <div class="welcome-screen" id="welcomeScreen">
+      <div class="welcome-hero">
+        <div class="welcome-avatar" id="welcomeAvatar">🤖</div>
+        <h1 class="welcome-title" id="welcomeTitle">DataBot</h1>
+        <p class="welcome-subtitle" id="welcomeMessage">Halo! Saya DataBot. Silakan ajukan pertanyaan tentang data Anda.</p>
+      </div>
+      <div class="suggestion-grid" id="suggestionGrid">
+        <!-- populated via JS -->
+      </div>
+    </div>
+
+    <!-- Chat Messages Area -->
+    <div class="chat-area" id="chatArea" style="display:none;">
+      <div class="chat-messages" id="chatMessages">
+        <!-- messages rendered here -->
+      </div>
+    </div>
+
+    <!-- Input Area -->
+    <div class="input-area">
+      <div class="input-container">
+        <textarea 
+          id="chatInput" 
+          class="chat-input" 
+          placeholder="Ketik pertanyaan tentang data Anda..." 
+          rows="1"
+          maxlength="2000"
+        ></textarea>
+        <button class="send-btn" id="sendBtn" disabled title="Kirim pesan (Enter)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+        </button>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+        <p class="input-hint" style="margin:0;">Tekan <kbd>Enter</kbd> untuk kirim, <kbd>Shift+Enter</kbd> untuk baris baru</p>
+        <span id="usageTextMain" style="font-size:0.75rem; color:var(--text-muted); font-weight:500;">Kuota: -- / --</span>
+      </div>
+    </div>
+  </main>
+
+  <!-- Mobile Sidebar Toggle -->
+  <button class="mobile-menu-btn" id="mobileMenuBtn">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+  </button>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Modal Overlay -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modalTitle">Judul Modal</h2>
+        <button class="modal-close" onclick="document.getElementById('modalOverlay').style.display='none'">&times;</button>
+      </div>
+      <div class="modal-body" id="modalBody">
+        <!-- content -->
+      </div>
+      <div class="modal-footer" id="modalFooter">
+        <!-- buttons -->
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/api.js"></script>
+  <script src="assets/js/renderer.js"></script>
+  <script src="assets/js/chat.js"></script>
+</body>
+</html>

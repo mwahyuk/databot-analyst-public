@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+
+# Environment & Secrets
+.env
+.env.local
+.env.production
+
+# Credential config files (use config.example.js as template)
+config.js
+**/config.js
+
+# Build output
+dist/
+build/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Vercel
+.vercel/
+
+# Cloudflare
+.wrangler/
+
+# Logs
+*.log
+npm-debug.log*
+
+.vercel
